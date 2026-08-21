@@ -22,12 +22,14 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           tagName: v__VERSION__
           releaseName: "稿件提取 v__VERSION__"
           releaseBody: "在下方下载适合您操作系统的安装包。"
           releaseDraft: false
           prerelease: false
+          releaseAssetNamePattern: "[name]_[version]_[arch][_setup][ext]"
           args: --target aarch64-apple-darwin --bundles app
       - name: Re-sign app and create DMG
         env:
@@ -42,6 +44,7 @@ jobs:
           codesign --verify --deep --strict "$APP"
           hdiutil create -volname "稿件提取" -srcfolder "$APP" -ov -format UDZO "$DMG"
           gh release upload "v${VERSION}" "$DMG" --clobber
+          if [ -f "release-notes/${VERSION}.md" ]; then gh release edit "v${VERSION}" --notes-file "release-notes/${VERSION}.md"; fi
 
   release-windows:
     needs: release-macos
@@ -56,10 +59,25 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           tagName: v__VERSION__
           releaseName: "稿件提取 v__VERSION__"
           releaseBody: "在下方下载适合您操作系统的安装包。"
           releaseDraft: false
           prerelease: false
+          releaseAssetNamePattern: "[name]_[version]_[arch][_setup][ext]"
           args: --bundles msi,nsis
+
+  finalize-release:
+    needs: release-windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish detailed Chinese release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          gh release edit "v${VERSION}" --notes-file "release-notes/${VERSION}.md"

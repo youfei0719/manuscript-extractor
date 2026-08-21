@@ -12,6 +12,7 @@ import type {
   RecognitionSession,
   TranscriptRecord,
   TranscriptExport,
+  AppUpdateInfo,
 } from "./types"
 
 export interface PersistedRecognitionState {
@@ -174,6 +175,29 @@ export const skillWorkbenchBridge = {
   async testModelConnection(): Promise<{ passed: boolean; model: string; message: string }> {
     if (!isNativeDesktop()) throw new Error("模型连接只在 Mac / Windows 桌面端可用")
     return invoke("test_model_connection")
+  },
+
+  async checkForUpdate(): Promise<AppUpdateInfo | null> {
+    if (!isNativeDesktop()) return null
+    const { check } = await import("@tauri-apps/plugin-updater")
+    const update = await check()
+    if (!update) return null
+    return {
+      currentVersion: update.currentVersion,
+      version: update.version,
+      date: update.date ?? null,
+      body: update.body ?? "本次更新暂无详细说明。",
+    }
+  },
+
+  async installUpdate(): Promise<void> {
+    if (!isNativeDesktop()) throw new Error("应用内更新只在安装后的桌面端可用")
+    const { check } = await import("@tauri-apps/plugin-updater")
+    const update = await check()
+    if (!update) throw new Error("当前已经是最新版本")
+    await update.downloadAndInstall()
+    const { relaunch } = await import("@tauri-apps/plugin-process")
+    await relaunch()
   },
 
   async onMediaProgress(handler: (progress: MediaProgress) => void): Promise<() => void> {

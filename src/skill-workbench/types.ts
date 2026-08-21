@@ -150,6 +150,13 @@ export interface RuntimeHealth {
   checkedAt: string
 }
 
+export interface AppUpdateInfo {
+  currentVersion: string
+  version: string
+  date: string | null
+  body: string
+}
+
 export type DiagnosticStatus = "started" | "success" | "error" | "info"
 
 export interface DiagnosticLog {
