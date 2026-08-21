@@ -2,6 +2,15 @@
 
 本地优先的短视频真实稿件提取桌面应用。它从经授权的抖音分享链接、本机视频或音频、以及已获授权的文本中取得可核对稿件，完成 AI 校对与人工确认后，将确认稿仅保存到本机。
 
+## 下载
+
+请从 [GitHub Releases](https://github.com/youfei0719/manuscript-extractor/releases/latest) 下载最新安装包：
+
+- macOS（Apple 芯片）：`.dmg`
+- Windows：`.msi` 或 `.exe`
+
+首次在 macOS 打开未签名应用时，系统可能要求在“系统设置 → 隐私与安全性”中确认打开。
+
 ## 能力范围
 
 - 识别经授权的抖音分享链接并提取真实语音稿件
