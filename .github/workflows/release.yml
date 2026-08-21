@@ -29,7 +29,7 @@ jobs:
           releaseBody: "在下方下载适合您操作系统的安装包。"
           releaseDraft: false
           prerelease: false
-          releaseAssetNamePattern: "[name]_[version]_[arch][_setup][ext]"
+          assetNamePattern: "[name]_[version]_[arch][_setup][ext]"
           args: --target aarch64-apple-darwin --bundles app
       - name: Re-sign app and create DMG
         env:
@@ -66,7 +66,7 @@ jobs:
           releaseBody: "在下方下载适合您操作系统的安装包。"
           releaseDraft: false
           prerelease: false
-          releaseAssetNamePattern: "[name]_[version]_[arch][_setup][ext]"
+          assetNamePattern: "[name]_[version]_[arch][_setup][ext]"
           args: --bundles msi,nsis
 
   finalize-release:
