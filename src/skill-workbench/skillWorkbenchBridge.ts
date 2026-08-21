@@ -179,14 +179,20 @@ export const skillWorkbenchBridge = {
 
   async checkForUpdate(): Promise<AppUpdateInfo | null> {
     if (!isNativeDesktop()) return null
-    const { check } = await import("@tauri-apps/plugin-updater")
-    const update = await check()
-    if (!update) return null
-    return {
-      currentVersion: update.currentVersion,
-      version: update.version,
-      date: update.date ?? null,
-      body: update.body ?? "本次更新暂无详细说明。",
+    try {
+      const { check } = await import("@tauri-apps/plugin-updater")
+      const update = await check()
+      if (!update) return null
+      return {
+        currentVersion: update.currentVersion,
+        version: update.version,
+        date: update.date ?? null,
+        body: update.body ?? "本次更新暂无详细说明。",
+      }
+    } catch (reason) {
+      const detail = reason instanceof Error ? reason.message : String(reason)
+      if (/404|latest\.json|endpoint/i.test(detail)) throw new Error("更新信息暂不可用。最新版本正在发布中，请稍后再试。")
+      throw new Error("无法连接更新服务，请检查网络后重试。")
     }
   },
 

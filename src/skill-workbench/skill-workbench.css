@@ -357,6 +357,42 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .page-title { align-items: flex-start; flex-direction: row; gap: 10px; }
 }
 
+/* Settings is organized by task: update, connections, diagnostics, then logs. */
+.diagnostics-page { max-width: 1320px; }
+.diagnostics-page .page-title { margin-bottom: 12px; }
+.about-update-panel { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-bottom: 14px; border: 1px solid var(--sw-border); border-left: 3px solid var(--sw-accent); border-radius: 6px; background: #fff; padding: 12px 14px; }
+.about-update-icon { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 5px; background: #edf8f5; color: var(--sw-accent); }
+.about-update-copy { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 18px; }
+.about-update-copy h2, .diagnostics-section h2 { margin: 0; color: var(--sw-text); font-size: 14px; line-height: 1.35; }
+.about-update-copy p, .diagnostics-section p { margin: 3px 0 0; color: var(--sw-muted); font-size: 12px; line-height: 1.5; }
+.about-update-copy dl { display: flex; flex: 0 0 auto; gap: 16px; margin: 0; }
+.about-update-copy dl > div { display: grid; gap: 2px; }
+.about-update-copy dt { color: var(--sw-faint); font-size: 11px; }
+.about-update-copy dd { margin: 0; color: var(--sw-text); font-size: 12px; font-weight: 600; }
+.diagnostics-section { margin-top: 14px; border-top: 1px solid var(--sw-border); padding-top: 14px; }
+.diagnostics-section > header { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 10px; }
+.diagnostics-section .diagnostic-overview { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+.diagnostics-section .diagnostic-overview > div { min-height: 70px; padding: 10px 12px; }
+.runtime-log-panel { margin-top: 14px; padding: 0; overflow: hidden; }
+.runtime-log-panel > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; padding: 12px; }
+.runtime-log-panel > summary::-webkit-details-marker { display: none; }
+.runtime-log-panel > summary h2 { margin: 0; font-size: 13px; }
+.runtime-log-panel > summary p { margin: 3px 0 0; color: var(--sw-muted); font-size: 11px; }
+.log-summary-action { display: inline-flex; align-items: center; gap: 5px; color: var(--sw-accent); font-size: 12px; font-weight: 600; }
+.runtime-log-content { position: relative; border-top: 1px solid var(--sw-border); padding: 10px 12px 12px; }
+.runtime-log-content > .icon-command { position: absolute; top: 10px; right: 12px; z-index: 1; }
+.runtime-log-content .runtime-log-list { padding-right: 36px; }
+
+@media (max-width: 720px) {
+  .about-update-panel { grid-template-columns: 30px minmax(0, 1fr); align-items: start; }
+  .about-update-panel > .primary-command { grid-column: 1 / -1; width: 100%; }
+  .about-update-copy { display: grid; gap: 8px; }
+  .about-update-copy dl { flex-wrap: wrap; gap: 10px 16px; }
+  .diagnostics-section > header { align-items: flex-start; flex-direction: column; }
+  .diagnostics-section > header button { width: 100%; }
+  .diagnostics-section .diagnostic-overview { grid-template-columns: 1fr; }
+}
+
 .candidate-workspace { border-bottom: 1px solid var(--sw-border); }
 .candidate-workspace:last-child { border-bottom: 0; }
 .candidate-workspace > summary { display: grid; min-height: 90px; grid-template-columns: 104px minmax(280px, 1.35fr) minmax(190px, .75fr) 110px; align-items: center; gap: 14px; cursor: pointer; padding: 11px 13px; list-style: none; }
