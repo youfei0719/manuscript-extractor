@@ -39,10 +39,14 @@ jobs:
           APP="src-tauri/target/aarch64-apple-darwin/release/bundle/macos/稿件提取.app"
           VERSION=$(node -p "require('./package.json').version")
           DMG="src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/稿件提取_${VERSION}_aarch64.dmg"
-          mkdir -p "$(dirname "$DMG")"
+          DMG_STAGE="$(mktemp -d)"
           codesign --force --deep --sign - "$APP"
           codesign --verify --deep --strict "$APP"
-          hdiutil create -volname "稿件提取" -srcfolder "$APP" -ov -format UDZO "$DMG"
+          cp -R "$APP" "$DMG_STAGE/稿件提取.app"
+          ln -s /Applications "$DMG_STAGE/Applications"
+          mkdir -p "$(dirname "$DMG")"
+          hdiutil create -volname "稿件提取" -srcfolder "$DMG_STAGE" -ov -format UDZO "$DMG"
+          rm -rf "$DMG_STAGE"
           gh release upload "v${VERSION}" "$DMG" --clobber
           if [ -f "release-notes/${VERSION}.md" ]; then gh release edit "v${VERSION}" --notes-file "release-notes/${VERSION}.md"; fi
 
