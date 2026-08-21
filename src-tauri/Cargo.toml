@@ -1,6 +1,6 @@
 [package]
 name = "manuscript-extractor"
-version = "0.1.8"
+version = "0.1.9"
 description = "Local-first short-video manuscript extraction desktop app"
 authors = ["Manuscript Extractor contributors"]
 edition = "2021"
