@@ -34,9 +34,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          APP="src-tauri/target/release/bundle/macos/稿件提取.app"
+          APP="src-tauri/target/aarch64-apple-darwin/release/bundle/macos/稿件提取.app"
           VERSION=$(node -p "require('./package.json').version")
-          DMG="src-tauri/target/release/bundle/dmg/稿件提取_${VERSION}_aarch64.dmg"
+          DMG="src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/稿件提取_${VERSION}_aarch64.dmg"
           mkdir -p "$(dirname "$DMG")"
           codesign --force --deep --sign - "$APP"
           codesign --verify --deep --strict "$APP"
