@@ -10,16 +10,8 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: macos-14
-            args: --target aarch64-apple-darwin --bundles dmg
-          - platform: windows-latest
-            args: --bundles msi,nsis
-    runs-on: ${{ matrix.platform }}
+  release-macos:
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,4 +28,38 @@ jobs:
           releaseBody: "在下方下载适合您操作系统的安装包。"
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          args: --target aarch64-apple-darwin --bundles app
+      - name: Re-sign app and create DMG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          APP="src-tauri/target/release/bundle/macos/稿件提取.app"
+          VERSION=$(node -p "require('./package.json').version")
+          DMG="src-tauri/target/release/bundle/dmg/稿件提取_${VERSION}_aarch64.dmg"
+          mkdir -p "$(dirname "$DMG")"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict "$APP"
+          hdiutil create -volname "稿件提取" -srcfolder "$APP" -ov -format UDZO "$DMG"
+          gh release upload "v${VERSION}" "$DMG" --clobber
+
+  release-windows:
+    needs: release-macos
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: "稿件提取 v__VERSION__"
+          releaseBody: "在下方下载适合您操作系统的安装包。"
+          releaseDraft: false
+          prerelease: false
+          args: --bundles msi,nsis
