@@ -9,6 +9,8 @@ use tokio::process::Command;
 pub const SETTINGS_KEY: &str = "workbench_settings_v1";
 pub const KEYRING_SERVICE: &str = "com.youfei.manuscript-extractor";
 pub const LOCAL_MLX_ASR_BASE: &str = "local://mlx-whisper";
+pub const TOKENFLUX_API_BASE: &str = "https://tokenflux.dev/v1";
+const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -101,9 +103,25 @@ pub fn load_settings(db: &DesktopDb) -> Result<WorkbenchSettings, String> {
         .load_app_value(SETTINGS_KEY)
         .map_err(|error| error.to_string())?
     {
-        Some(value) => serde_json::from_value(value).map_err(|error| error.to_string()),
+        Some(value) => {
+            let settings = serde_json::from_value(value).map_err(|error| error.to_string())?;
+            Ok(normalize_provider_defaults(settings))
+        }
         None => Ok(WorkbenchSettings::default()),
     }
+}
+
+/// Older builds kept the remote OpenAI ASR default when TokenFlux was selected
+/// for text proofreading. That made the text-only key get sent to a separate
+/// transcription service and produced a misleading 401. Keep the provider's
+/// documented default (local MLX) for those legacy settings; users can still
+/// opt into a remote ASR backend explicitly in the settings panel.
+pub fn normalize_provider_defaults(mut settings: WorkbenchSettings) -> WorkbenchSettings {
+    if settings.llm_api_base == TOKENFLUX_API_BASE && settings.asr_api_base == OPENAI_API_BASE {
+        settings.asr_api_base = LOCAL_MLX_ASR_BASE.into();
+        settings.asr_model = "mlx-community/whisper-large-v3-turbo".into();
+    }
+    settings
 }
 
 pub fn save_settings(db: &DesktopDb, settings: &WorkbenchSettings) -> Result<(), String> {
@@ -433,8 +451,11 @@ pub async fn settings_status(db: &DesktopDb) -> Result<SettingsStatus, String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        clean_asr_base, uses_local_mlx_asr, version_argument, WorkbenchSettings, LOCAL_MLX_ASR_BASE,
+        clean_asr_base, normalize_provider_defaults, uses_local_mlx_asr, version_argument,
+        WorkbenchSettings, LOCAL_MLX_ASR_BASE, TOKENFLUX_API_BASE,
     };
+
+    const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
 
     #[test]
     fn uses_ffmpegs_supported_version_flag() {
@@ -453,5 +474,29 @@ mod tests {
         let mut settings = WorkbenchSettings::default();
         settings.asr_api_base = LOCAL_MLX_ASR_BASE.into();
         assert!(uses_local_mlx_asr(&settings));
+    }
+
+    #[test]
+    fn migrates_legacy_tokenflux_openai_asr_default_to_local_mlx() {
+        let settings = WorkbenchSettings {
+            llm_api_base: TOKENFLUX_API_BASE.into(),
+            asr_api_base: OPENAI_API_BASE.into(),
+            asr_model: "whisper-1".into(),
+            ..WorkbenchSettings::default()
+        };
+        let normalized = normalize_provider_defaults(settings);
+        assert_eq!(normalized.asr_api_base, LOCAL_MLX_ASR_BASE);
+        assert_eq!(normalized.asr_model, "mlx-community/whisper-large-v3-turbo");
+    }
+
+    #[test]
+    fn preserves_explicit_remote_asr_when_not_using_openai_default() {
+        let settings = WorkbenchSettings {
+            llm_api_base: TOKENFLUX_API_BASE.into(),
+            asr_api_base: "https://speech.example/v1".into(),
+            ..WorkbenchSettings::default()
+        };
+        let normalized = normalize_provider_defaults(settings);
+        assert_eq!(normalized.asr_api_base, "https://speech.example/v1");
     }
 }

@@ -40,7 +40,7 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           RELEASE_DIR="$(mktemp -d)"
           DMG_RAW="src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/稿件提取-${VERSION}-AppleSilicon.dmg"
-          DMG="$RELEASE_DIR/稿件提取-v${VERSION}-macOS-AppleSilicon.dmg"
+          DMG="$RELEASE_DIR/ManuscriptExtractor-v${VERSION}-macOS-AppleSilicon.dmg"
           DMG_STAGE="$(mktemp -d)"
           codesign --force --deep --sign - "$APP"
           codesign --verify --deep --strict "$APP"
@@ -50,12 +50,12 @@ jobs:
           hdiutil create -volname "稿件提取" -srcfolder "$DMG_STAGE" -ov -format UDZO "$DMG_RAW"
           rm -rf "$DMG_STAGE"
           cp "$DMG_RAW" "$DMG"
-          cp "src-tauri/target/aarch64-apple-darwin/release/bundle/macos/稿件提取.app.tar.gz" "$RELEASE_DIR/稿件提取-v${VERSION}-macOS-AppleSilicon.app.tar.gz"
-          cp "src-tauri/target/aarch64-apple-darwin/release/bundle/macos/稿件提取.app.tar.gz.sig" "$RELEASE_DIR/稿件提取-v${VERSION}-macOS-AppleSilicon.app.tar.gz.sig"
+          cp "src-tauri/target/aarch64-apple-darwin/release/bundle/macos/稿件提取.app.tar.gz" "$RELEASE_DIR/ManuscriptExtractor-v${VERSION}-macOS-AppleSilicon.app.tar.gz"
+          cp "src-tauri/target/aarch64-apple-darwin/release/bundle/macos/稿件提取.app.tar.gz.sig" "$RELEASE_DIR/ManuscriptExtractor-v${VERSION}-macOS-AppleSilicon.app.tar.gz.sig"
           gh release upload "v${VERSION}" \
             "$DMG" \
-            "$RELEASE_DIR/稿件提取-v${VERSION}-macOS-AppleSilicon.app.tar.gz" \
-            "$RELEASE_DIR/稿件提取-v${VERSION}-macOS-AppleSilicon.app.tar.gz.sig" --clobber
+            "$RELEASE_DIR/ManuscriptExtractor-v${VERSION}-macOS-AppleSilicon.app.tar.gz" \
+            "$RELEASE_DIR/ManuscriptExtractor-v${VERSION}-macOS-AppleSilicon.app.tar.gz.sig" --clobber
           gh release delete-asset "v${VERSION}" "_${VERSION}_aarch64.app.tar.gz" --yes || true
           gh release delete-asset "v${VERSION}" "_${VERSION}_aarch64.app.tar.gz.sig" --yes || true
           rm -rf "$RELEASE_DIR"
@@ -91,15 +91,15 @@ jobs:
           set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
           RELEASE_DIR="$(mktemp -d)"
-          cp "src-tauri/target/release/bundle/nsis/稿件提取_${VERSION}_x64-setup.exe" "$RELEASE_DIR/稿件提取-v${VERSION}-Windows-x64-Setup.exe"
-          cp "src-tauri/target/release/bundle/nsis/稿件提取_${VERSION}_x64-setup.exe.sig" "$RELEASE_DIR/稿件提取-v${VERSION}-Windows-x64-Setup.exe.sig"
-          cp "src-tauri/target/release/bundle/msi/稿件提取_${VERSION}_x64_zh-CN.msi" "$RELEASE_DIR/稿件提取-v${VERSION}-Windows-x64.msi"
-          cp "src-tauri/target/release/bundle/msi/稿件提取_${VERSION}_x64_zh-CN.msi.sig" "$RELEASE_DIR/稿件提取-v${VERSION}-Windows-x64.msi.sig"
+          cp "src-tauri/target/release/bundle/nsis/稿件提取_${VERSION}_x64-setup.exe" "$RELEASE_DIR/ManuscriptExtractor-v${VERSION}-Windows-x64-Setup.exe"
+          cp "src-tauri/target/release/bundle/nsis/稿件提取_${VERSION}_x64-setup.exe.sig" "$RELEASE_DIR/ManuscriptExtractor-v${VERSION}-Windows-x64-Setup.exe.sig"
+          cp "src-tauri/target/release/bundle/msi/稿件提取_${VERSION}_x64_zh-CN.msi" "$RELEASE_DIR/ManuscriptExtractor-v${VERSION}-Windows-x64.msi"
+          cp "src-tauri/target/release/bundle/msi/稿件提取_${VERSION}_x64_zh-CN.msi.sig" "$RELEASE_DIR/ManuscriptExtractor-v${VERSION}-Windows-x64.msi.sig"
           gh release upload "v${VERSION}" \
-            "$RELEASE_DIR/稿件提取-v${VERSION}-Windows-x64-Setup.exe" \
-            "$RELEASE_DIR/稿件提取-v${VERSION}-Windows-x64-Setup.exe.sig" \
-            "$RELEASE_DIR/稿件提取-v${VERSION}-Windows-x64.msi" \
-            "$RELEASE_DIR/稿件提取-v${VERSION}-Windows-x64.msi.sig" --clobber
+            "$RELEASE_DIR/ManuscriptExtractor-v${VERSION}-Windows-x64-Setup.exe" \
+            "$RELEASE_DIR/ManuscriptExtractor-v${VERSION}-Windows-x64-Setup.exe.sig" \
+            "$RELEASE_DIR/ManuscriptExtractor-v${VERSION}-Windows-x64.msi" \
+            "$RELEASE_DIR/ManuscriptExtractor-v${VERSION}-Windows-x64.msi.sig" --clobber
           gh release delete-asset "v${VERSION}" "_${VERSION}_x64_setup.exe" --yes || true
           gh release delete-asset "v${VERSION}" "_${VERSION}_x64_setup.exe.sig" --yes || true
           gh release delete-asset "v${VERSION}" "_${VERSION}_x64.msi" --yes || true
@@ -125,8 +125,8 @@ jobs:
           set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
           mkdir -p /tmp/updater
-          MAC_TAR="稿件提取-v${VERSION}-macOS-AppleSilicon.app.tar.gz"
-          WIN_EXE="稿件提取-v${VERSION}-Windows-x64-Setup.exe"
+          MAC_TAR="ManuscriptExtractor-v${VERSION}-macOS-AppleSilicon.app.tar.gz"
+          WIN_EXE="ManuscriptExtractor-v${VERSION}-Windows-x64-Setup.exe"
           gh release download "v${VERSION}" --repo "${GITHUB_REPOSITORY}" --pattern "${MAC_TAR}.sig" --dir /tmp/updater
           gh release download "v${VERSION}" --repo "${GITHUB_REPOSITORY}" --pattern "${WIN_EXE}.sig" --dir /tmp/updater
           MAC_SIG=$(cat "/tmp/updater/${MAC_TAR}.sig")

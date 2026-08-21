@@ -98,12 +98,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .work-panel > header { min-height: 62px; border-bottom: 1px solid var(--sw-border); padding: 12px 13px 10px; }
 .work-panel > header h1, .work-panel > header h2 { margin: 0; font-size: 13px; line-height: 18px; }
 .work-panel > header p { margin: 3px 0 0; color: var(--sw-muted); font-size: 9px; line-height: 14px; }
-.source-panel > header { display: flex; justify-content: space-between; gap: 16px; }
+.source-panel > header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; }
+.source-panel > header > div { flex: 1 1 260px; }
+.source-panel > header .text-button { flex: 0 0 auto; margin-left: auto; }
 .workflow-rail { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border-bottom: 1px solid var(--sw-border); padding: 10px 12px; }
-.workflow-rail > div { position: relative; display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; gap: 5px; color: var(--sw-faint); }
+.workflow-rail > div { position: relative; display: grid; min-width: 0; grid-template-columns: 18px minmax(0, 1fr); align-items: center; gap: 5px; color: var(--sw-faint); }
 .workflow-rail > div:not(:last-child)::after { position: absolute; top: 8px; right: 4px; left: 22px; height: 2px; background: #e4e9ea; content: ""; }
 .workflow-rail > div > span { z-index: 1; display: grid; width: 18px; height: 18px; place-items: center; border-radius: 50%; background: #eef1f2; color: var(--sw-faint); font-size: 8px; }
-.workflow-rail small { overflow: hidden; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.workflow-rail small { position: relative; z-index: 1; min-width: 0; overflow: hidden; background: var(--sw-panel); padding-right: 3px; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .workflow-rail > div.is-complete { color: var(--sw-accent); }
 .workflow-rail > div.is-complete > span { background: var(--sw-accent-soft); color: var(--sw-accent); }
 .workflow-rail > div.is-complete::after { background: #8bc9ba; }
