@@ -1,4 +1,4 @@
-import { CheckCircle2, KeyRound, LoaderCircle, RefreshCw, ServerCog, Wrench } from "lucide-react"
+import { CheckCircle2, CircleAlert, KeyRound, LoaderCircle, RefreshCw, ServerCog, Sparkles, Wrench } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { isNativeDesktop, skillWorkbenchBridge } from "./skillWorkbenchBridge"
 import type { LocalSettings, ProviderModels, SettingsUpdate } from "./types"
@@ -6,6 +6,9 @@ import type { LocalSettings, ProviderModels, SettingsUpdate } from "./types"
 function message(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
+
+const TOKENFLUX_BASE = "https://tokenflux.dev/v1"
+const TOKENFLUX_MODEL = "gpt-5.4"
 
 export function SettingsPanel({ onSettingsChanged }: { onSettingsChanged?: () => void }) {
   const [settings, setSettings] = useState<LocalSettings | null>(null)
@@ -105,6 +108,19 @@ export function SettingsPanel({ onSettingsChanged }: { onSettingsChanged?: () =>
     asrModel: (draft.asrModel ?? "").startsWith("mlx-community/") ? "whisper-1" : draft.asrModel,
   })
 
+  const chooseProvider = (provider: "tokenflux" | "custom") => {
+    if (provider === "tokenflux") {
+      update({ llmApiBase: TOKENFLUX_BASE, llmModel: TOKENFLUX_MODEL, llmMode: "required" })
+      setNotice("已选择 TokenFlux 中转站；保存后会使用本机已保存的模型密钥。")
+      return
+    }
+    update({ llmMode: "required" })
+    setNotice("已切换为自定义 OpenAI 兼容接口，请确认 API Base 和模型名称。")
+  }
+
+  const tokenfluxSelected = draft.llmApiBase === TOKENFLUX_BASE
+  const needsOnlineMode = draft.llmMode === "offline" && Boolean(settings?.llmApiKeyConfigured)
+
   if (!isNativeDesktop()) return <section className="settings-panel"><header><ServerCog size={17} /><div><h2>桌面运行时设置</h2><p>当前是浏览器只读预览。真实下载、转写、模型和凭据只在安装后的桌面端运行。</p></div></header></section>
 
   return <section className="settings-panel">
@@ -112,17 +128,32 @@ export function SettingsPanel({ onSettingsChanged }: { onSettingsChanged?: () =>
     {notice ? <div className="inline-notice is-success" role="status"><CheckCircle2 size={14} />{notice}</div> : null}
     {error ? <div className="inline-notice is-danger" role="alert">{error}</div> : null}
 
-    <div className="settings-section">
+    <div className="settings-section connection-section">
       <div className="settings-title"><KeyRound size={15} /><strong>模型与转写连接</strong><span>{settings?.llmApiKeyConfigured ? "模型密钥已保存" : "模型密钥未配置"} · {settings?.asrBackend === "local_mlx" ? "本机转写无需密钥" : settings?.asrApiKeyConfigured ? "转写密钥已保存" : "转写密钥未配置"} · 网络：{settings?.networkProxySource ?? "检查中"}</span></div>
-      <div className="settings-grid">
-        <label>模型模式<select value={draft.llmMode ?? "offline"} onChange={(event) => update({ llmMode: event.target.value as LocalSettings["llmMode"] })}><option value="offline">offline</option><option value="optional">optional</option><option value="required">required</option></select></label>
-        <label>文本模型<input value={draft.llmModel ?? ""} onChange={(event) => update({ llmModel: event.target.value })} /></label>
-        <label>文本 API Base<input value={draft.llmApiBase ?? ""} onChange={(event) => update({ llmApiBase: event.target.value })} /></label>
-        <label>文本 API Key<input type="password" value={draft.llmApiKey ?? ""} placeholder={settings?.llmApiKeyConfigured ? "已安全保存；留空不修改" : "保存到系统凭据库"} onChange={(event) => update({ llmApiKey: event.target.value })} /></label>
-        <div className="settings-field"><span>转写方式</span><div className="segmented compact"><button type="button" className={localAsr ? "is-active" : ""} onClick={() => chooseAsrBackend("local")}>本机 MLX</button><button type="button" className={!localAsr ? "is-active" : ""} onClick={() => chooseAsrBackend("api")}>兼容 API</button></div></div>
-        <label>转写模型<input value={draft.asrModel ?? ""} onChange={(event) => update({ asrModel: event.target.value })} /></label>
-        {!localAsr ? <label>转写 API Base<input value={draft.asrApiBase ?? ""} onChange={(event) => update({ asrApiBase: event.target.value })} /></label> : null}
-        {!localAsr ? <label>转写 API Key<input type="password" value={draft.asrApiKey ?? ""} placeholder="留空则复用文本 API Key" onChange={(event) => update({ asrApiKey: event.target.value })} /></label> : null}
+      <div className="provider-picker" aria-label="模型服务商">
+        <div><span className="field-kicker">模型服务商</span><strong>{tokenfluxSelected ? "TokenFlux 中转站" : "自定义 OpenAI 兼容接口"}</strong><small>{tokenfluxSelected ? "营销号文稿分析密钥可直接使用" : "适用于其他兼容 Chat Completions 的服务"}</small></div>
+        <div className="segmented"><button type="button" className={tokenfluxSelected ? "is-active" : ""} onClick={() => chooseProvider("tokenflux")}><Sparkles size={14} />TokenFlux</button><button type="button" className={!tokenfluxSelected ? "is-active" : ""} onClick={() => chooseProvider("custom")}>自定义</button></div>
+      </div>
+      {needsOnlineMode ? <div className="inline-notice is-warning" role="status"><CircleAlert size={14} /><span>已检测到本机模型密钥，但当前仍是离线模式。选择上方服务商并保存后，校对才会真正调用模型。</span></div> : null}
+      <div className="settings-subsection">
+        <div className="subsection-heading"><strong>文本校对</strong><span>真实稿件会发送到这里进行 AI 校对</span></div>
+        <div className="settings-grid model-grid">
+          <div className="settings-field"><span>运行模式</span><div className="segmented"><button type="button" className={draft.llmMode === "offline" ? "is-active" : ""} onClick={() => update({ llmMode: "offline" })}>仅本机</button><button type="button" className={draft.llmMode !== "offline" ? "is-active" : ""} onClick={() => update({ llmMode: "required" })}>联网模型</button></div></div>
+          <label>文本模型<input value={draft.llmModel ?? ""} onChange={(event) => update({ llmModel: event.target.value })} /></label>
+          <label>文本 API Base<input value={draft.llmApiBase ?? ""} onChange={(event) => update({ llmApiBase: event.target.value })} /></label>
+          <label>文本 API Key<input type="password" value={draft.llmApiKey ?? ""} placeholder={settings?.llmApiKeyConfigured ? "已安全保存；留空不修改" : "保存到系统凭据库"} onChange={(event) => update({ llmApiKey: event.target.value })} /></label>
+        </div>
+      </div>
+      <div className="settings-subsection">
+        <div className="subsection-heading"><strong>语音转写</strong><span>可使用本机 MLX，或复用兼容 API</span></div>
+        <div className="settings-grid asr-grid">
+          <div className="settings-field"><span>转写方式</span><div className="segmented"><button type="button" className={localAsr ? "is-active" : ""} onClick={() => chooseAsrBackend("local")}>本机 MLX</button><button type="button" className={!localAsr ? "is-active" : ""} onClick={() => chooseAsrBackend("api")}>兼容 API</button></div></div>
+          <label>转写模型<input value={draft.asrModel ?? ""} onChange={(event) => update({ asrModel: event.target.value })} /></label>
+          {!localAsr ? <label>转写 API Base<input value={draft.asrApiBase ?? ""} onChange={(event) => update({ asrApiBase: event.target.value })} /></label> : null}
+          {!localAsr ? <label>转写 API Key<input type="password" value={draft.asrApiKey ?? ""} placeholder="留空则复用文本 API Key" onChange={(event) => update({ asrApiKey: event.target.value })} /></label> : null}
+        </div>
+      </div>
+      <div className="settings-grid optional-grid">
         <label>网络代理（可选）<input value={draft.networkProxy ?? ""} placeholder="留空自动使用系统/环境代理" onChange={(event) => update({ networkProxy: event.target.value })} /></label>
         <label>yt-dlp 降级 Cookie（可选）<input type="password" value={draft.douyinCookieString ?? ""} placeholder={settings?.douyinCookieConfigured ? "已安全保存；留空不修改" : "无登录浏览器解析不需要 Cookie"} onChange={(event) => update({ douyinCookieString: event.target.value })} /></label>
       </div>
