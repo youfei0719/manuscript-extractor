@@ -551,7 +551,6 @@ async fn transcribe_local_mlx(settings: &WorkbenchSettings, audio: &Path) -> Res
 
 async fn transcribe_api(settings: &WorkbenchSettings, audio: &Path) -> Result<Value, String> {
     let key = read_secret("asr_api_key")?
-        .or(read_secret("llm_api_key")?)
         .ok_or_else(|| "尚未在系统凭据库保存转写 API Key".to_string())?;
     let bytes = tokio::fs::read(audio)
         .await
@@ -590,7 +589,7 @@ async fn transcribe_api(settings: &WorkbenchSettings, audio: &Path) -> Result<Va
                     .map(ToOwned::to_owned)
             })
             .unwrap_or_else(|| raw.chars().take(300).collect());
-        return Err(format!("转写请求失败（{status}）：{detail}"));
+        return Err(audit::provider_error("转写", status.as_u16(), &detail));
     }
     let value: Value =
         serde_json::from_str(&raw).map_err(|error| format!("转写响应不是 JSON：{error}"))?;

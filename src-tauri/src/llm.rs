@@ -1,3 +1,4 @@
+use crate::audit;
 use crate::db::DesktopDb;
 use crate::settings::{api_client, load_settings, read_secret};
 use serde::Deserialize;
@@ -89,7 +90,7 @@ async fn chat_json(db: &DesktopDb, system: &str, user: &str) -> Result<(Value, S
                     .map(ToOwned::to_owned)
             })
             .unwrap_or_else(|| raw.chars().take(300).collect());
-        return Err(format!("模型请求失败（{status}）：{detail}"));
+        return Err(audit::provider_error("模型", status.as_u16(), &detail));
     }
     let envelope: Value =
         serde_json::from_str(&raw).map_err(|error| format!("模型响应不是 JSON：{error}"))?;

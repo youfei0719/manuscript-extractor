@@ -60,12 +60,22 @@ pub fn failure_code(action: &str, error: &str) -> &'static str {
 
 pub fn sanitize_detail(value: &str) -> String {
     let mut output = value.replace('\n', " ").replace('\r', " ");
-    for pattern in [r"sk-[A-Za-z0-9_-]+", r"Bearer\s+[^\s]+", r"https?://[^\s]+", r"/(Users|private|var)/[^\s]+"] {
+    for pattern in [r"sk-[A-Za-z0-9._-]+", r"Bearer\s+[^\s]+", r"https?://[^\s]+", r"/(Users|private|var)/[^\s]+"] {
         if let Ok(regex) = Regex::new(pattern) {
             output = regex.replace_all(&output, "[已脱敏]").into_owned();
         }
     }
     output.chars().take(1200).collect()
+}
+
+pub fn provider_error(service: &str, status: u16, detail: &str) -> String {
+    if matches!(status, 401 | 403) {
+        return format!("{service}服务拒绝请求，请检查服务地址和对应的 API 密钥。")
+    }
+    format!(
+        "{service}请求失败（HTTP {status}）：{}",
+        sanitize_detail(detail)
+    )
 }
 
 #[cfg(test)]
@@ -78,5 +88,12 @@ mod tests {
         assert!(!value.contains("abc"));
         assert!(!value.contains("example.test"));
         assert!(!value.contains("/Users/a"));
+    }
+
+    #[test]
+    fn hides_provider_credentials_from_user_errors() {
+        let value = provider_error("转写", 401, "Incorrect API key provided: sensitive-token");
+        assert_eq!(value, "转写服务拒绝请求，请检查服务地址和对应的 API 密钥。");
+        assert!(!value.contains("sensitive-token"));
     }
 }

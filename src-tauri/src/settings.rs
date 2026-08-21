@@ -398,8 +398,7 @@ pub async fn settings_status(db: &DesktopDb) -> Result<SettingsStatus, String> {
     );
     let local_asr = uses_local_mlx_asr(&settings);
     let proxy_source = proxy_route(&settings)?.map(|route| route.source.to_string()).unwrap_or_else(|| "直连".into());
-    let asr_api_key_configured =
-        read_secret("asr_api_key")?.is_some() || read_secret("llm_api_key")?.is_some();
+    let asr_api_key_configured = read_secret("asr_api_key")?.is_some();
     let repository_ready = !settings.skill_repository_path.is_empty()
         && Path::new(&settings.skill_repository_path)
             .join(".git")

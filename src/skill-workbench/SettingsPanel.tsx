@@ -110,8 +110,14 @@ export function SettingsPanel({ onSettingsChanged }: { onSettingsChanged?: () =>
 
   const chooseProvider = (provider: "tokenflux" | "custom") => {
     if (provider === "tokenflux") {
-      update({ llmApiBase: TOKENFLUX_BASE, llmModel: TOKENFLUX_MODEL, llmMode: "required" })
-      setNotice("已选择 TokenFlux 中转站；保存后会使用本机已保存的模型密钥。")
+      update({
+        llmApiBase: TOKENFLUX_BASE,
+        llmModel: TOKENFLUX_MODEL,
+        llmMode: "required",
+        asrApiBase: "local://mlx-whisper",
+        asrModel: "mlx-community/whisper-large-v3-turbo",
+      })
+      setNotice("已选择 TokenFlux；语音转写默认使用本机 MLX，不会把文本模型密钥发给其他转写服务。")
       return
     }
     update({ llmMode: "required" })
@@ -145,12 +151,12 @@ export function SettingsPanel({ onSettingsChanged }: { onSettingsChanged?: () =>
         </div>
       </div>
       <div className="settings-subsection">
-        <div className="subsection-heading"><strong>语音转写</strong><span>可使用本机 MLX，或复用兼容 API</span></div>
+        <div className="subsection-heading"><strong>语音转写</strong><span>可使用本机 MLX，或配置独立的兼容 API</span></div>
         <div className="settings-grid asr-grid">
           <div className="settings-field"><span>转写方式</span><div className="segmented"><button type="button" className={localAsr ? "is-active" : ""} onClick={() => chooseAsrBackend("local")}>本机 MLX</button><button type="button" className={!localAsr ? "is-active" : ""} onClick={() => chooseAsrBackend("api")}>兼容 API</button></div></div>
           <label>转写模型<input value={draft.asrModel ?? ""} onChange={(event) => update({ asrModel: event.target.value })} /></label>
           {!localAsr ? <label>转写 API Base<input value={draft.asrApiBase ?? ""} onChange={(event) => update({ asrApiBase: event.target.value })} /></label> : null}
-          {!localAsr ? <label>转写 API Key<input type="password" value={draft.asrApiKey ?? ""} placeholder="留空则复用文本 API Key" onChange={(event) => update({ asrApiKey: event.target.value })} /></label> : null}
+          {!localAsr ? <label>转写 API Key<input type="password" value={draft.asrApiKey ?? ""} placeholder={settings?.asrApiKeyConfigured ? "已安全保存；留空不修改" : "必须单独配置转写密钥"} onChange={(event) => update({ asrApiKey: event.target.value })} /></label> : null}
         </div>
       </div>
       <div className="settings-grid optional-grid">
