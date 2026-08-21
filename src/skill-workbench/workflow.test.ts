@@ -46,6 +46,16 @@ describe("Skill 沉淀状态机", () => {
     expect(value.split("\n\n")).toHaveLength(2)
   })
 
+  it("为缺少句末标点的长 ASR 文本补充分段", () => {
+    const value = formatTranscript("这是一个没有句号的连续转写文本用于模拟真实语音识别结果它会不断向后延伸并包含足够多的背景信息但是后面还有新的判断所以不能让所有文字挤在同一个段落中同时还要保留原始语义最后给出一个收束结论")
+    expect(value.split("\n\n").length).toBeGreaterThan(1)
+  })
+
+  it("保留已有的自然段空行", () => {
+    const value = formatTranscript("第一段已经由用户确认。\n\n第二段也需要保持原样。")
+    expect(value).toBe("第一段已经由用户确认。\n\n第二段也需要保持原样。")
+  })
+
   it("没有真实稿件时拒绝结构拆解", () => {
     const blocked = createSourceSession({ ...source(1), mode: "douyin_link", authorized: false }, "transcript_blocked")
     expect(applyModelStructure(blocked, { name: "x", purpose: "x", hook: "x", progression: "x", ending: "x", riskBoundary: "x", sourceCount: 1 })).toEqual(blocked)

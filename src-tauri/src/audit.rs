@@ -28,6 +28,21 @@ pub fn record(
 
 pub fn failure_code(action: &str, error: &str) -> &'static str {
     if action == "media.process" {
+        if error.contains("拒绝请求") || error.contains("API 密钥") || error.contains("HTTP 401") || error.contains("HTTP 403") {
+            return "MEDIA_TRANSCRIPTION_AUTH_FAILED";
+        }
+        if error.contains("请求过于频繁") || error.contains("HTTP 429") {
+            return "MEDIA_TRANSCRIPTION_RATE_LIMITED";
+        }
+        if error.contains("暂时不可用") || error.contains("HTTP 500") || error.contains("HTTP 502") || error.contains("HTTP 503") || error.contains("HTTP 504") {
+            return "MEDIA_TRANSCRIPTION_PROVIDER_UNAVAILABLE";
+        }
+        if error.contains("连接失败") || error.contains("timed out") || error.contains("connection") {
+            return "MEDIA_TRANSCRIPTION_CONNECTION_FAILED";
+        }
+        if error.contains("转写结果") || error.contains("有效 JSON") || error.contains("text 字段") {
+            return "MEDIA_TRANSCRIPTION_RESULT_INVALID";
+        }
         if error.contains("本机 MLX Whisper") {
             return "MEDIA_LOCAL_TRANSCRIPTION_FAILED";
         }
@@ -49,10 +64,39 @@ pub fn failure_code(action: &str, error: &str) -> &'static str {
         if error.contains("尚未配置") || error.contains("凭据库") || error.contains("offline") {
             return "LLM_CONFIGURATION_REQUIRED";
         }
-        if error.contains("模型请求失败") || error.contains("模型连接失败") {
-            return "LLM_REQUEST_FAILED";
+        if error.contains("拒绝请求") || error.contains("API 密钥") || error.contains("HTTP 401") || error.contains("HTTP 403") {
+            return "LLM_AUTH_FAILED";
         }
-        return "LLM_RESPONSE_INVALID";
+        if error.contains("请求过于频繁") || error.contains("HTTP 429") {
+            return "LLM_RATE_LIMITED";
+        }
+        if error.contains("暂时不可用") || error.contains("HTTP 500") || error.contains("HTTP 502") || error.contains("HTTP 503") || error.contains("HTTP 504") {
+            return "LLM_PROVIDER_UNAVAILABLE";
+        }
+        if error.contains("连接失败") || error.contains("timed out") || error.contains("connection") {
+            return "LLM_CONNECTION_FAILED";
+        }
+        if error.contains("模型内容不是有效 JSON") || error.contains("模型响应不是 JSON") || error.contains("可解析的文本内容") || error.contains("模型结果缺少") {
+            return "LLM_RESPONSE_INVALID";
+        }
+        return "LLM_REQUEST_FAILED";
+    }
+    if action.contains("transcription") {
+        if error.contains("拒绝请求") || error.contains("API 密钥") || error.contains("HTTP 401") || error.contains("HTTP 403") {
+            return "MEDIA_TRANSCRIPTION_AUTH_FAILED";
+        }
+        if error.contains("请求过于频繁") || error.contains("HTTP 429") {
+            return "MEDIA_TRANSCRIPTION_RATE_LIMITED";
+        }
+        if error.contains("暂时不可用") || error.contains("HTTP 500") || error.contains("HTTP 502") || error.contains("HTTP 503") || error.contains("HTTP 504") {
+            return "MEDIA_TRANSCRIPTION_PROVIDER_UNAVAILABLE";
+        }
+        if error.contains("连接失败") || error.contains("timed out") || error.contains("connection") {
+            return "MEDIA_TRANSCRIPTION_CONNECTION_FAILED";
+        }
+        if error.contains("转写结果") || error.contains("有效 JSON") || error.contains("text 字段") {
+            return "MEDIA_TRANSCRIPTION_RESULT_INVALID";
+        }
     }
     if action.starts_with("publish.") { return "PUBLISH_OPERATION_FAILED"; }
     "RUNTIME_OPERATION_FAILED"
@@ -108,5 +152,15 @@ mod tests {
         let value = provider_error("模型", 502, "error code: 502");
         assert!(value.contains("暂时不可用"));
         assert!(!value.contains("error code"));
+    }
+
+    #[test]
+    fn classifies_llm_failures_by_root_cause() {
+        assert_eq!(failure_code("llm.proofread", "模型服务暂时不可用（HTTP 502）"), "LLM_PROVIDER_UNAVAILABLE");
+        assert_eq!(failure_code("llm.proofread", "模型服务拒绝请求，请检查服务地址和对应的 API 密钥。"), "LLM_AUTH_FAILED");
+        assert_eq!(failure_code("llm.proofread", "模型服务当前请求过于频繁，请稍后重试。"), "LLM_RATE_LIMITED");
+        assert_eq!(failure_code("llm.proofread", "模型连接失败：timed out"), "LLM_CONNECTION_FAILED");
+        assert_eq!(failure_code("llm.proofread", "模型内容不是有效 JSON"), "LLM_RESPONSE_INVALID");
+        assert_eq!(failure_code("llm.proofread", "模型请求失败（HTTP 400）：参数错误"), "LLM_REQUEST_FAILED");
     }
 }
