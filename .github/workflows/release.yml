@@ -92,20 +92,6 @@ jobs:
           set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
           mkdir -p /tmp/updater
-          normalize_asset() {
-            old_name="$1"
-            new_name="$2"
-            gh release download "v${VERSION}" --repo "${GITHUB_REPOSITORY}" --pattern "$old_name" --dir /tmp/updater
-            gh release upload "v${VERSION}" "/tmp/updater/${old_name}#${new_name}" --repo "${GITHUB_REPOSITORY}" --clobber
-            gh release delete-asset "v${VERSION}" "$old_name" --repo "${GITHUB_REPOSITORY}" --yes
-          }
-          normalize_asset "_${VERSION}_aarch64.app.tar.gz" "稿件提取_${VERSION}_aarch64.app.tar.gz"
-          normalize_asset "_${VERSION}_aarch64.app.tar.gz.sig" "稿件提取_${VERSION}_aarch64.app.tar.gz.sig"
-          normalize_asset "_${VERSION}_aarch64.dmg" "稿件提取_${VERSION}_aarch64.dmg"
-          normalize_asset "_${VERSION}_x64_setup.exe" "稿件提取_${VERSION}_x64_setup.exe"
-          normalize_asset "_${VERSION}_x64_setup.exe.sig" "稿件提取_${VERSION}_x64_setup.exe.sig"
-          normalize_asset "_${VERSION}_x64.msi" "稿件提取_${VERSION}_x64.msi"
-          normalize_asset "_${VERSION}_x64.msi.sig" "稿件提取_${VERSION}_x64.msi.sig"
           MAC_TAR="稿件提取_${VERSION}_aarch64.app.tar.gz"
           WIN_EXE="稿件提取_${VERSION}_x64_setup.exe"
           gh release download "v${VERSION}" --repo "${GITHUB_REPOSITORY}" --pattern "${MAC_TAR}.sig" --dir /tmp/updater
