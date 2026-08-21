@@ -29,7 +29,7 @@ jobs:
           releaseBody: "在下方下载适合您操作系统的安装包。"
           releaseDraft: false
           prerelease: false
-          assetNamePattern: "[name]_[version]_[arch][_setup][ext]"
+          assetNamePattern: "稿件提取_[version]_[arch][_setup][ext]"
           args: --target aarch64-apple-darwin --bundles app
       - name: Re-sign app and create DMG
         env:
@@ -66,7 +66,7 @@ jobs:
           releaseBody: "在下方下载适合您操作系统的安装包。"
           releaseDraft: false
           prerelease: false
-          assetNamePattern: "[name]_[version]_[arch][_setup][ext]"
+          assetNamePattern: "稿件提取_[version]_[arch][_setup][ext]"
           args: --bundles msi,nsis
 
   finalize-release:
@@ -81,3 +81,20 @@ jobs:
           set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
           gh release edit "v${VERSION}" --notes-file "release-notes/${VERSION}.md"
+      - name: Publish updater metadata
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          MAC_TAR="稿件提取_${VERSION}_aarch64.app.tar.gz"
+          WIN_EXE="稿件提取_${VERSION}_x64_setup.exe"
+          mkdir -p /tmp/updater
+          gh release download "v${VERSION}" --repo "${GITHUB_REPOSITORY}" --pattern "${MAC_TAR}.sig" --dir /tmp/updater
+          gh release download "v${VERSION}" --repo "${GITHUB_REPOSITORY}" --pattern "${WIN_EXE}.sig" --dir /tmp/updater
+          MAC_SIG=$(cat "/tmp/updater/${MAC_TAR}.sig")
+          WIN_SIG=$(cat "/tmp/updater/${WIN_EXE}.sig")
+          MAC_URL=$(gh release view "v${VERSION}" --repo "${GITHUB_REPOSITORY}" --json assets --jq ".assets[] | select(.name == \"${MAC_TAR}\") | .url")
+          WIN_URL=$(gh release view "v${VERSION}" --repo "${GITHUB_REPOSITORY}" --json assets --jq ".assets[] | select(.name == \"${WIN_EXE}\") | .url")
+          jq -n --arg version "$VERSION" --arg notes "$(cat release-notes/${VERSION}.md)" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg macSig "$MAC_SIG" --arg macUrl "$MAC_URL" --arg winSig "$WIN_SIG" --arg winUrl "$WIN_URL" '{version:$version,notes:$notes,pub_date:$date,platforms:{"darwin-aarch64":{signature:$macSig,url:$macUrl},"windows-x86_64":{signature:$winSig,url:$winUrl}}}' > /tmp/updater/latest.json
+          gh release upload "v${VERSION}" /tmp/updater/latest.json --repo "${GITHUB_REPOSITORY}" --clobber
