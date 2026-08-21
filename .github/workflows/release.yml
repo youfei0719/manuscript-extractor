@@ -92,6 +92,33 @@ jobs:
           set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
           mkdir -p /tmp/updater
+          find_asset() {
+            suffix="$1"
+            gh release view "v${VERSION}" --repo "${GITHUB_REPOSITORY}" --json assets --jq ".assets[] | select(.name | endswith(\"${suffix}\")) | .name" | head -n 1
+          }
+          normalize_asset() {
+            suffix="$1"
+            desired="$2"
+            actual=$(find_asset "$suffix")
+            if [ -z "$actual" ]; then
+              echo "Missing release asset ending with ${suffix}" >&2
+              exit 1
+            fi
+            if [ "$actual" = "$desired" ]; then
+              return
+            fi
+            gh release download "v${VERSION}" --repo "${GITHUB_REPOSITORY}" --pattern "$actual" --dir /tmp/updater
+            cp "/tmp/updater/${actual}" "/tmp/updater/${desired}"
+            gh release upload "v${VERSION}" "/tmp/updater/${desired}" --repo "${GITHUB_REPOSITORY}" --clobber
+            gh release delete-asset "v${VERSION}" "$actual" --repo "${GITHUB_REPOSITORY}" --yes
+          }
+          normalize_asset "_${VERSION}_aarch64.app.tar.gz" "稿件提取_${VERSION}_aarch64.app.tar.gz"
+          normalize_asset "_${VERSION}_aarch64.app.tar.gz.sig" "稿件提取_${VERSION}_aarch64.app.tar.gz.sig"
+          normalize_asset "_${VERSION}_aarch64.dmg" "稿件提取_${VERSION}_aarch64.dmg"
+          normalize_asset "_${VERSION}_x64_setup.exe" "稿件提取_${VERSION}_x64_setup.exe"
+          normalize_asset "_${VERSION}_x64_setup.exe.sig" "稿件提取_${VERSION}_x64_setup.exe.sig"
+          normalize_asset "_${VERSION}_x64.msi" "稿件提取_${VERSION}_x64.msi"
+          normalize_asset "_${VERSION}_x64.msi.sig" "稿件提取_${VERSION}_x64.msi.sig"
           MAC_TAR="稿件提取_${VERSION}_aarch64.app.tar.gz"
           WIN_EXE="稿件提取_${VERSION}_x64_setup.exe"
           gh release download "v${VERSION}" --repo "${GITHUB_REPOSITORY}" --pattern "${MAC_TAR}.sig" --dir /tmp/updater
