@@ -39,14 +39,17 @@ jobs:
           APP="src-tauri/target/aarch64-apple-darwin/release/bundle/macos/稿件提取.app"
           VERSION=$(node -p "require('./package.json').version")
           RELEASE_DIR="$(mktemp -d)"
+          DMG_RAW="src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/稿件提取-${VERSION}-AppleSilicon.dmg"
           DMG="$RELEASE_DIR/稿件提取-v${VERSION}-macOS-AppleSilicon.dmg"
           DMG_STAGE="$(mktemp -d)"
           codesign --force --deep --sign - "$APP"
           codesign --verify --deep --strict "$APP"
           cp -R "$APP" "$DMG_STAGE/稿件提取.app"
           ln -s /Applications "$DMG_STAGE/Applications"
-          hdiutil create -volname "稿件提取" -srcfolder "$DMG_STAGE" -ov -format UDZO "$DMG"
+          mkdir -p "$(dirname "$DMG_RAW")"
+          hdiutil create -volname "稿件提取" -srcfolder "$DMG_STAGE" -ov -format UDZO "$DMG_RAW"
           rm -rf "$DMG_STAGE"
+          cp "$DMG_RAW" "$DMG"
           cp "src-tauri/target/aarch64-apple-darwin/release/bundle/macos/稿件提取.app.tar.gz" "$RELEASE_DIR/稿件提取-v${VERSION}-macOS-AppleSilicon.app.tar.gz"
           cp "src-tauri/target/aarch64-apple-darwin/release/bundle/macos/稿件提取.app.tar.gz.sig" "$RELEASE_DIR/稿件提取-v${VERSION}-macOS-AppleSilicon.app.tar.gz.sig"
           gh release upload "v${VERSION}" \
