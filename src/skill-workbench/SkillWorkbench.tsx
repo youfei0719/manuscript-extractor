@@ -4,10 +4,10 @@ import { TranscriptHistoryPage } from "./TranscriptHistoryPage"
 import { SettingsPage } from "./SettingsPage"
 import { WorkbenchShell } from "./Shell"
 import { skillWorkbenchBridge } from "./skillWorkbenchBridge"
+import { formatTranscript } from "./transcriptFormatting"
 import type { DiagnosticLog, RecognitionPage, RecognitionSession, RuntimeHealth, SourceRecord, TranscriptRecord } from "./types"
 import "./skill-workbench.css"
 
-function formatTranscript(value: string) { const normalized = value.trim().replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n"); if (normalized.includes("\n\n")) return normalized; const sentences = normalized.match(/[^。！？!?；;]+[。！？!?；;]?/g) ?? [normalized]; const paragraphs: string[] = []; let current = ""; for (const sentence of sentences) { const next = `${current}${sentence}`.trim(); if (current && next.length > 120) { paragraphs.push(current); current = sentence.trim() } else current = next } if (current) paragraphs.push(current); return paragraphs.join("\n\n") }
 function emptySession(): RecognitionSession { return { stage: "awaiting_source", source: null, transcript: "", transcriptQuality: "unavailable", proofread: null, events: [] } }
 function sourceSession(source: SourceRecord, stage: RecognitionSession["stage"], transcript = ""): RecognitionSession { return { stage, source, transcript, transcriptQuality: transcript ? "needs_review" : "unavailable", proofread: null, events: [] } }
 

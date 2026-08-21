@@ -54,15 +54,7 @@ async fn chat_json(db: &DesktopDb, system: &str, user: &str) -> Result<(Value, S
     });
     let (http, _) = api_client(&settings, 120)?;
     let url = endpoint(&settings.llm_api_base, "chat/completions");
-    let response = http
-        .post(&url)
-        .bearer_auth(&key)
-        .json(&body)
-        .send()
-        .await
-        .map_err(|error| format!("模型连接失败：{error}"))?;
-    let mut status = response.status();
-    let mut raw = response.text().await.map_err(|error| error.to_string())?;
+    let (mut status, mut raw) = send_chat_request(&http, &url, &key, &body).await?;
     if status == reqwest::StatusCode::BAD_REQUEST
         && raw.to_ascii_lowercase().contains("response_format")
     {
@@ -70,15 +62,7 @@ async fn chat_json(db: &DesktopDb, system: &str, user: &str) -> Result<(Value, S
         fallback
             .as_object_mut()
             .map(|object| object.remove("response_format"));
-        let response = http
-            .post(&url)
-            .bearer_auth(&key)
-            .json(&fallback)
-            .send()
-            .await
-            .map_err(|error| format!("模型兼容请求失败：{error}"))?;
-        status = response.status();
-        raw = response.text().await.map_err(|error| error.to_string())?;
+        (status, raw) = send_chat_request(&http, &url, &key, &fallback).await?;
     }
     if !status.is_success() {
         let detail = serde_json::from_str::<Value>(&raw)
@@ -97,6 +81,30 @@ async fn chat_json(db: &DesktopDb, system: &str, user: &str) -> Result<(Value, S
     let parsed = serde_json::from_str(&json_content(&envelope)?)
         .map_err(|error| format!("模型内容不是有效 JSON：{error}"))?;
     Ok((parsed, settings.llm_model))
+}
+
+async fn send_chat_request(
+    http: &reqwest::Client,
+    url: &str,
+    key: &str,
+    body: &Value,
+) -> Result<(reqwest::StatusCode, String), String> {
+    for attempt in 0..3 {
+        let response = http
+            .post(url)
+            .bearer_auth(key)
+            .json(body)
+            .send()
+            .await
+            .map_err(|error| format!("模型连接失败：{error}"))?;
+        let status = response.status();
+        let raw = response.text().await.map_err(|error| error.to_string())?;
+        if !matches!(status.as_u16(), 502 | 503 | 504) || attempt == 2 {
+            return Ok((status, raw));
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(700 * (attempt + 1))).await;
+    }
+    unreachable!("transient model request loop always returns")
 }
 
 fn required_text(value: &Value, key: &str) -> Result<String, String> {

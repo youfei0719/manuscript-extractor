@@ -72,6 +72,12 @@ pub fn provider_error(service: &str, status: u16, detail: &str) -> String {
     if matches!(status, 401 | 403) {
         return format!("{service}服务拒绝请求，请检查服务地址和对应的 API 密钥。")
     }
+    if status == 429 {
+        return format!("{service}服务当前请求过于频繁，请稍后重试。")
+    }
+    if (500..=599).contains(&status) {
+        return format!("{service}服务暂时不可用（HTTP {status}），请稍后重试；若持续失败，请检查服务商状态或切换模型。")
+    }
     format!(
         "{service}请求失败（HTTP {status}）：{}",
         sanitize_detail(detail)
@@ -95,5 +101,12 @@ mod tests {
         let value = provider_error("转写", 401, "Incorrect API key provided: sensitive-token");
         assert_eq!(value, "转写服务拒绝请求，请检查服务地址和对应的 API 密钥。");
         assert!(!value.contains("sensitive-token"));
+    }
+
+    #[test]
+    fn gives_actionable_transient_provider_error() {
+        let value = provider_error("模型", 502, "error code: 502");
+        assert!(value.contains("暂时不可用"));
+        assert!(!value.contains("error code"));
     }
 }

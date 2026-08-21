@@ -9,6 +9,7 @@ import {
   recordModelEvaluation,
   saveCandidateFromSession,
 } from "./workflow"
+import { formatTranscript } from "./transcriptFormatting"
 
 function source(index: number): SourceRecord {
   return {
@@ -39,6 +40,12 @@ function structuredSession(index: number) {
 }
 
 describe("Skill 沉淀状态机", () => {
+  it("按句子边界把连续转写整理成自然段", () => {
+    const value = formatTranscript("第一句说明背景。这是第二句补充信息。这里是第三句推进判断。最后一句收束结论。")
+    expect(value).toContain("\n\n")
+    expect(value.split("\n\n")).toHaveLength(2)
+  })
+
   it("没有真实稿件时拒绝结构拆解", () => {
     const blocked = createSourceSession({ ...source(1), mode: "douyin_link", authorized: false }, "transcript_blocked")
     expect(applyModelStructure(blocked, { name: "x", purpose: "x", hook: "x", progression: "x", ending: "x", riskBoundary: "x", sourceCount: 1 })).toEqual(blocked)

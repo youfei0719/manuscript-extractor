@@ -147,6 +147,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .transcript-editor, .proofread-transcript { display: grid; gap: 5px; }
 .transcript-editor > span, .proofread-transcript > span { color: var(--sw-faint); font-size: 8px; font-weight: 700; }
 .transcript-editor textarea, .proofread-transcript textarea { width: 100%; resize: vertical; border: 1px solid var(--sw-border-strong); border-radius: 5px; background: #fff; color: var(--sw-text); padding: 8px 9px; font-size: 10px; line-height: 17px; white-space: pre-wrap; }
+.step-detail > textarea[aria-label="提取真实稿件"] { min-height: 320px; font-size: 15px !important; line-height: 1.75 !important; }
+.proofread-transcript textarea { min-height: 360px; font-size: 15px !important; line-height: 1.75 !important; }
 .transcript-editor textarea:disabled { color: #59666c; background: #f7f9f9; }
 .proofread-review { display: grid; gap: 8px; }
 .proofread-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
@@ -298,6 +300,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .deposit-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 8px; }
   .workflow-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 8px; }
   .workflow-rail > div::after { display: none; }
+  .step-detail > textarea[aria-label="提取真实稿件"] { min-height: 240px; font-size: 14px !important; }
+  .proofread-transcript textarea { min-height: 280px; font-size: 14px !important; }
   .transcript-history-item { grid-template-columns: 30px minmax(0, 1fr); align-items: start; }
   .history-actions { grid-column: 2; justify-self: end; }
   .page-title { align-items: flex-start; flex-direction: column; gap: 6px; }
