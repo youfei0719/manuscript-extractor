@@ -15,6 +15,7 @@ import type {
 } from "./types";
 import { UpdateDialog } from "./UpdateDialog";
 import type { AppUpdateInfo } from "./types";
+import type { ProofreadPhase } from "./proofreadPresentation";
 import "./skill-workbench.css";
 
 function emptySession(): RecognitionSession {
@@ -54,9 +55,7 @@ export default function SkillWorkbench() {
     [progress, setProgress] = useState<string | null>(null),
     [progressStage, setProgressStage] = useState("idle"),
     [proofreading, setProofreading] = useState(false),
-    [proofreadPhase, setProofreadPhase] = useState<
-      "idle" | "connecting" | "reviewing" | "formatting" | "error"
-    >("idle"),
+    [proofreadPhase, setProofreadPhase] = useState<ProofreadPhase>("idle"),
     [logs, setLogs] = useState<DiagnosticLog[]>([]),
     [update, setUpdate] = useState<AppUpdateInfo | null>(null),
     [updateChecking, setUpdateChecking] = useState(false);
@@ -175,7 +174,10 @@ export default function SkillWorkbench() {
           ? `AI 已识别 ${review.corrections.length} 处可确认修改，请审核后继续。`
           : "AI 已完成语义校对和自然分段，请审核稿件后继续。",
       );
-      window.setTimeout(() => setProofreadPhase("idle"), 420);
+      proofreadPhaseTimer.current = window.setTimeout(() => {
+        proofreadPhaseTimer.current = null;
+        setProofreadPhase("idle");
+      }, 420);
     } catch (error) {
       if (proofreadPhaseTimer.current)
         window.clearTimeout(proofreadPhaseTimer.current);

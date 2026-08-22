@@ -74,6 +74,24 @@ fn provider_detail(raw: &str, code: Option<&str>, request_id: Option<&str>) -> S
     parts.join("; ")
 }
 
+fn parse_model_list(raw: &str, status: reqwest::StatusCode, request_id: Option<&str>) -> Result<Value, String> {
+    let value = serde_json::from_str::<Value>(raw).map_err(|error| {
+        if status.is_success() {
+            format!("模型响应不是有效 JSON：{error}")
+        } else {
+            let code = response_error_code(raw);
+            let detail = provider_detail(raw, code.as_deref(), request_id);
+            audit::provider_error("模型", status.as_u16(), &detail)
+        }
+    })?;
+    if !status.is_success() {
+        let code = response_error_code(raw);
+        let detail = provider_detail(raw, code.as_deref(), request_id);
+        return Err(audit::provider_error("模型", status.as_u16(), &detail));
+    }
+    Ok(value)
+}
+
 async fn chat_json(db: &DesktopDb, system: &str, user: &str) -> Result<(Value, String), String> {
     let settings = load_settings(db)?;
     if settings.llm_mode == "offline" {
@@ -236,12 +254,7 @@ pub async fn list_models(db: &DesktopDb) -> Result<Value, String> {
         .text()
         .await
         .map_err(|error| format!("拉取模型失败：{error}"))?;
-    let value: Value = serde_json::from_str(&raw).unwrap_or_else(|_| json!({}));
-    if !status.is_success() {
-        let code = response_error_code(&raw);
-        let detail = provider_detail(&raw, code.as_deref(), request_id.as_deref());
-        return Err(audit::provider_error("模型", status.as_u16(), &detail));
-    }
+    let value = parse_model_list(&raw, status, request_id.as_deref())?;
     let mut models: Vec<String> = value
         .get("data")
         .and_then(Value::as_array)
@@ -317,5 +330,20 @@ mod tests {
             ),
             "provider_code=UPSTREAM_SERVICE_UNAVAILABLE; error code: 502; request_id=req-123"
         );
+    }
+
+    #[test]
+    fn classifies_successful_non_json_model_list_as_invalid_response() {
+        let error = parse_model_list("<html>gateway error</html>", reqwest::StatusCode::OK, None)
+            .expect_err("non-json model response must fail");
+        assert!(error.starts_with("模型响应不是有效 JSON："));
+    }
+
+    #[test]
+    fn keeps_provider_error_classification_for_non_json_502() {
+        let error = parse_model_list("Bad Gateway", reqwest::StatusCode::BAD_GATEWAY, Some("req-1"))
+            .expect_err("502 must be surfaced");
+        assert!(error.contains("未提供具体原因"));
+        assert!(!error.contains("req-1"));
     }
 }

@@ -17,6 +17,7 @@ import type {
   SourceMode,
   TranscriptProofreadResult,
 } from "./types";
+import { proofreadPresentation, type ProofreadPhase } from "./proofreadPresentation";
 
 function Review({
   review,
@@ -119,7 +120,7 @@ export function DepositPage({
   progressMessage: string | null;
   progressStage: string;
   proofreading: boolean;
-  proofreadPhase: "idle" | "connecting" | "reviewing" | "formatting" | "error";
+  proofreadPhase: ProofreadPhase;
   onRecognizeLink: (value: string) => void;
   onImportMedia: (file?: File) => void;
   onUseTranscript: (transcript: string, sourceLabel: string) => void;
@@ -157,26 +158,7 @@ export function DepositPage({
               : progressStage === "completed"
                 ? 100
                 : 0;
-  const proofreadLabel =
-    proofreadPhase === "connecting"
-      ? "正在连接模型"
-      : proofreadPhase === "reviewing"
-        ? "模型正在校对稿件"
-        : proofreadPhase === "formatting"
-          ? "正在整理语义段落"
-          : proofreadPhase === "error"
-            ? "重新运行 AI 校对"
-            : "运行 AI 校对";
-  const proofreadStatus = proofreading
-    ? proofreadLabel
-    : proofreadPhase === "error"
-      ? "校对没有完成"
-      : "准备校对";
-  const proofreadDescription = proofreading
-    ? "请求完成后会自动整理自然段并显示修改建议"
-    : proofreadPhase === "error"
-      ? "可检查设置后重新运行，原始转写不会丢失"
-      : "AI 将只基于当前真实稿件提出可审核修改";
+  const proofread = proofreadPresentation(proofreadPhase, proofreading);
   return (
     <section className="deposit-page">
       {notice ? (
@@ -460,19 +442,19 @@ export function DepositPage({
                   />
                 ) : transcriptReady && !confirmed ? (
                   <>
-                    <div className={`proofread-status${proofreading ? " is-active" : proofreadPhase === "error" ? " is-error" : ""}`} aria-live="polite">
+                    <div className={`proofread-status${proofread.isRunning ? " is-active" : proofread.isRetry ? " is-error" : ""}`} aria-live="polite">
                       <span className="proofread-status-mark"><Sparkles size={14} /></span>
-                      <div><strong>{proofreadStatus}</strong><small>{proofreadDescription}</small></div>
-                      <span className="proofread-status-dots" aria-hidden="true"><i /><i /><i /></span>
+                      <div><strong>{proofread.status}</strong><small>{proofread.description}</small></div>
+                      {proofread.isRunning ? <span className="proofread-status-dots" aria-hidden="true"><i /><i /><i /></span> : null}
                     </div>
                     <button
                       type="button"
-                      className={`secondary-command proofread-command${proofreading ? " is-running" : ""}${proofreadPhase === "error" ? " is-retry" : ""}`}
+                      className={`secondary-command proofread-command${proofread.isRunning ? " is-running" : ""}${proofread.isRetry ? " is-retry" : ""}`}
                       disabled={proofreading}
                       onClick={onProofread}
                     >
-                      <Sparkles size={14} className={proofreading ? "proofread-icon-spin" : ""} />
-                      {proofreadLabel}
+                      <Sparkles size={14} className={proofread.isRunning ? "proofread-icon-spin" : ""} />
+                      {proofread.label}
                     </button>
                   </>
                 ) : null}

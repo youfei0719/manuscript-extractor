@@ -145,6 +145,11 @@ pub fn provider_error(service: &str, status: u16, detail: &str) -> String {
             return format!("{service}上游服务过载（HTTP {status}），请稍后重试。")
         }
         let safe_detail = sanitize_detail(detail);
+        let visible_detail = safe_detail
+            .split("; request_id=")
+            .next()
+            .unwrap_or(safe_detail.as_str())
+            .trim();
         let provider_code = normalized
             .split("provider_code=")
             .nth(1)
@@ -155,14 +160,18 @@ pub fn provider_error(service: &str, status: u16, detail: &str) -> String {
         if let Some(provider_code) = provider_code {
             return format!("{service}服务暂时不可用（HTTP {status}，服务商错误码：{provider_code}），服务商未提供更多原因；请稍后重试并检查服务商状态。")
         }
-        if !safe_detail.is_empty()
-            && safe_detail.len() <= 180
-            && !safe_detail.starts_with('{')
-            && !safe_detail.to_ascii_lowercase().contains("error code")
+        if !visible_detail.is_empty()
+            && visible_detail.len() <= 180
+            && !visible_detail.starts_with('{')
+            && !visible_detail.to_ascii_lowercase().contains("error code")
+            && !matches!(
+                visible_detail.to_ascii_lowercase().as_str(),
+                "bad gateway" | "gateway error" | "service unavailable" | "502" | "503" | "504"
+            )
         {
-            return format!("{service}服务暂时不可用（HTTP {status}）：{safe_detail}")
+            return format!("{service}服务暂时不可用（HTTP {status}）：{visible_detail}")
         }
-        return format!("{service}服务暂时不可用（HTTP {status}），请稍后重试；若持续失败，请检查服务商状态或切换模型。")
+        return format!("{service}服务商返回 HTTP {status}，但未提供具体原因。请检查模型分组、余额和上游账号状态，或稍后重试。")
     }
     format!(
         "{service}请求失败（HTTP {status}）：{}",
@@ -192,7 +201,8 @@ mod tests {
     #[test]
     fn gives_actionable_transient_provider_error() {
         let value = provider_error("模型", 502, "error code: 502");
-        assert!(value.contains("暂时不可用"));
+        assert!(value.contains("未提供具体原因"));
+        assert!(value.contains("模型分组、余额和上游账号状态"));
         assert!(!value.contains("error code"));
     }
 
