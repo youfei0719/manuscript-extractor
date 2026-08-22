@@ -64,7 +64,13 @@ pub fn failure_code(action: &str, error: &str) -> &'static str {
         if error.contains("尚未配置") || error.contains("凭据库") || error.contains("offline") {
             return "LLM_CONFIGURATION_REQUIRED";
         }
-        if error.contains("拒绝请求") || error.contains("API 密钥") || error.contains("HTTP 401") || error.contains("HTTP 403") {
+        if error.contains("拒绝请求")
+            || error.contains("上游认证失败")
+            || error.contains("上游拒绝访问")
+            || error.contains("API 密钥")
+            || error.contains("HTTP 401")
+            || error.contains("HTTP 403")
+        {
             return "LLM_AUTH_FAILED";
         }
         if error.contains("请求过于频繁") || error.contains("HTTP 429") {
@@ -121,22 +127,34 @@ pub fn provider_error(service: &str, status: u16, detail: &str) -> String {
     }
     if (500..=599).contains(&status) {
         let normalized = detail.trim().to_ascii_lowercase();
-        if normalized.contains("upstream authentication failed") {
+        if normalized.contains("upstream_auth_failed") || normalized.contains("upstream authentication failed") {
             return format!("{service}上游认证失败（HTTP {status}），请在服务商控制台检查分组和上游账号状态。")
         }
-        if normalized.contains("upstream access forbidden") {
+        if normalized.contains("upstream_access_forbidden") || normalized.contains("upstream access forbidden") {
             return format!("{service}上游拒绝访问（HTTP {status}），请更换可用分组或联系服务商管理员。")
         }
-        if normalized.contains("all available accounts exhausted") {
+        if normalized.contains("all available accounts exhausted")
+            || normalized.contains("upstream_accounts_exhausted")
+        {
             return format!("{service}上游可用账号已耗尽（HTTP {status}），请稍后重试或切换模型/分组。")
         }
-        if normalized.contains("no available accounts") {
+        if normalized.contains("no available accounts") || normalized.contains("no_available_accounts") {
             return format!("{service}当前分组没有可用上游账号（HTTP {status}），请更换分组或稍后重试。")
         }
-        if normalized.contains("upstream service overloaded") {
+        if normalized.contains("upstream service overloaded") || normalized.contains("upstream_service_overloaded") {
             return format!("{service}上游服务过载（HTTP {status}），请稍后重试。")
         }
         let safe_detail = sanitize_detail(detail);
+        let provider_code = normalized
+            .split("provider_code=")
+            .nth(1)
+            .and_then(|value| value.split(';').next())
+            .map(str::trim)
+            .filter(|value| !value.is_empty() && value.chars().all(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '-' | '.')))
+            .map(|value| value.chars().take(80).collect::<String>());
+        if let Some(provider_code) = provider_code {
+            return format!("{service}服务暂时不可用（HTTP {status}，服务商错误码：{provider_code}），服务商未提供更多原因；请稍后重试并检查服务商状态。")
+        }
         if !safe_detail.is_empty()
             && safe_detail.len() <= 180
             && !safe_detail.starts_with('{')
@@ -179,10 +197,25 @@ mod tests {
     }
 
     #[test]
+    fn preserves_provider_code_when_message_is_missing() {
+        let value = provider_error("模型", 502, "provider_code=UPSTREAM_SERVICE_UNAVAILABLE; error code: 502");
+        assert!(value.contains("服务商错误码：upstream_service_unavailable"));
+        assert!(!value.contains("error code"));
+    }
+
+    #[test]
     fn preserves_actionable_upstream_502_causes_without_sensitive_details() {
         assert_eq!(
             provider_error("模型", 502, "Upstream authentication failed, please contact administrator"),
             "模型上游认证失败（HTTP 502），请在服务商控制台检查分组和上游账号状态。"
+        );
+        assert_eq!(
+            failure_code("llm.proofread", "模型上游认证失败（HTTP 502），请检查分组"),
+            "LLM_AUTH_FAILED"
+        );
+        assert_eq!(
+            failure_code("llm.proofread", "模型上游拒绝访问（HTTP 502），请更换分组"),
+            "LLM_AUTH_FAILED"
         );
         assert!(provider_error("模型", 502, "Upstream service temporarily unavailable").contains("Upstream service temporarily unavailable"));
         assert!(!provider_error("模型", 502, "Bearer sk-secret").contains("sk-secret"));

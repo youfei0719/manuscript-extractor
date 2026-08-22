@@ -46,6 +46,34 @@ fn response_error_detail(raw: &str) -> String {
         .unwrap_or_else(|| raw.chars().take(300).collect())
 }
 
+fn response_error_code(raw: &str) -> Option<String> {
+    let value = serde_json::from_str::<Value>(raw).ok()?;
+    value
+        .pointer("/error/code")
+        .or_else(|| value.pointer("/code"))
+        .or_else(|| value.pointer("/error/type"))
+        .or_else(|| value.pointer("/type"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|code| !code.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn provider_detail(raw: &str, code: Option<&str>, request_id: Option<&str>) -> String {
+    let detail = response_error_detail(raw);
+    let mut parts = Vec::new();
+    if let Some(code) = code.filter(|value| !value.is_empty()) {
+        parts.push(format!("provider_code={code}"));
+    }
+    if !detail.trim().is_empty() {
+        parts.push(detail);
+    }
+    if let Some(request_id) = request_id.filter(|value| !value.is_empty()) {
+        parts.push(format!("request_id={request_id}"));
+    }
+    parts.join("; ")
+}
+
 async fn chat_json(db: &DesktopDb, system: &str, user: &str) -> Result<(Value, String), String> {
     let settings = load_settings(db)?;
     if settings.llm_mode == "offline" {
@@ -67,7 +95,7 @@ async fn chat_json(db: &DesktopDb, system: &str, user: &str) -> Result<(Value, S
     });
     let (http, _) = api_client(&settings, 120)?;
     let url = endpoint(&settings.llm_api_base, "chat/completions");
-    let (mut status, mut raw) = send_chat_request(&http, &url, &key, &body).await?;
+    let (mut status, mut raw, mut request_id) = send_chat_request(&http, &url, &key, &body).await?;
     if status == reqwest::StatusCode::BAD_REQUEST
         && raw.to_ascii_lowercase().contains("response_format")
     {
@@ -75,10 +103,11 @@ async fn chat_json(db: &DesktopDb, system: &str, user: &str) -> Result<(Value, S
         fallback
             .as_object_mut()
             .map(|object| object.remove("response_format"));
-        (status, raw) = send_chat_request(&http, &url, &key, &fallback).await?;
+        (status, raw, request_id) = send_chat_request(&http, &url, &key, &fallback).await?;
     }
     if !status.is_success() {
-        let detail = response_error_detail(&raw);
+        let code = response_error_code(&raw);
+        let detail = provider_detail(&raw, code.as_deref(), request_id.as_deref());
         return Err(audit::provider_error("模型", status.as_u16(), &detail));
     }
     let envelope: Value =
@@ -93,7 +122,7 @@ async fn send_chat_request(
     url: &str,
     key: &str,
     body: &Value,
-) -> Result<(reqwest::StatusCode, String), String> {
+) -> Result<(reqwest::StatusCode, String, Option<String>), String> {
     for attempt in 0..3 {
         let response = http
             .post(url)
@@ -103,13 +132,22 @@ async fn send_chat_request(
             .await
             .map_err(|error| format!("模型连接失败：{error}"))?;
         let status = response.status();
+        let request_id = response
+            .headers()
+            .get("x-request-id")
+            .or_else(|| response.headers().get("x-ratelimit-request-id"))
+            .or_else(|| response.headers().get("cf-ray"))
+            .and_then(|value| value.to_str().ok())
+            .map(ToOwned::to_owned);
         let raw = response.text().await.map_err(|error| error.to_string())?;
         let body_lower = raw.to_ascii_lowercase();
         let retryable = matches!(status.as_u16(), 502 | 503 | 504)
             && !body_lower.contains("upstream authentication failed")
-            && !body_lower.contains("upstream access forbidden");
+            && !body_lower.contains("upstream_auth_failed")
+            && !body_lower.contains("upstream access forbidden")
+            && !body_lower.contains("upstream_access_forbidden");
         if !retryable || attempt == 2 {
-            return Ok((status, raw));
+            return Ok((status, raw, request_id));
         }
         tokio::time::sleep(std::time::Duration::from_millis(700 * (attempt + 1))).await;
     }
@@ -187,13 +225,22 @@ pub async fn list_models(db: &DesktopDb) -> Result<Value, String> {
         .await
         .map_err(|error| format!("拉取模型失败：{error}"))?;
     let status = response.status();
-    let value: Value = response.json().await.map_err(|error| error.to_string())?;
+    let request_id = response
+        .headers()
+        .get("x-request-id")
+        .or_else(|| response.headers().get("x-ratelimit-request-id"))
+        .or_else(|| response.headers().get("cf-ray"))
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    let raw = response
+        .text()
+        .await
+        .map_err(|error| format!("拉取模型失败：{error}"))?;
+    let value: Value = serde_json::from_str(&raw).unwrap_or_else(|_| json!({}));
     if !status.is_success() {
-        return Err(value
-            .pointer("/error/message")
-            .and_then(Value::as_str)
-            .unwrap_or("模型服务拒绝请求")
-            .to_string());
+        let code = response_error_code(&raw);
+        let detail = provider_detail(&raw, code.as_deref(), request_id.as_deref());
+        return Err(audit::provider_error("模型", status.as_u16(), &detail));
     }
     let mut models: Vec<String> = value
         .get("data")
@@ -257,6 +304,18 @@ mod tests {
         assert_eq!(
             response_error_detail(r#"{"error":{"message":"Upstream access forbidden"}}"#),
             "Upstream access forbidden"
+        );
+        assert_eq!(
+            response_error_code(r#"{"error":{"code":"UPSTREAM_AUTH_FAILED"}}"#).as_deref(),
+            Some("UPSTREAM_AUTH_FAILED")
+        );
+        assert_eq!(
+            provider_detail(
+                r#"{"code":"UPSTREAM_SERVICE_UNAVAILABLE","message":"error code: 502"}"#,
+                response_error_code(r#"{"code":"UPSTREAM_SERVICE_UNAVAILABLE","message":"error code: 502"}"#).as_deref(),
+                Some("req-123")
+            ),
+            "provider_code=UPSTREAM_SERVICE_UNAVAILABLE; error code: 502; request_id=req-123"
         );
     }
 }
