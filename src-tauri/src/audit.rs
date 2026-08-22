@@ -120,6 +120,30 @@ pub fn provider_error(service: &str, status: u16, detail: &str) -> String {
         return format!("{service}服务当前请求过于频繁，请稍后重试。")
     }
     if (500..=599).contains(&status) {
+        let normalized = detail.trim().to_ascii_lowercase();
+        if normalized.contains("upstream authentication failed") {
+            return format!("{service}上游认证失败（HTTP {status}），请在服务商控制台检查分组和上游账号状态。")
+        }
+        if normalized.contains("upstream access forbidden") {
+            return format!("{service}上游拒绝访问（HTTP {status}），请更换可用分组或联系服务商管理员。")
+        }
+        if normalized.contains("all available accounts exhausted") {
+            return format!("{service}上游可用账号已耗尽（HTTP {status}），请稍后重试或切换模型/分组。")
+        }
+        if normalized.contains("no available accounts") {
+            return format!("{service}当前分组没有可用上游账号（HTTP {status}），请更换分组或稍后重试。")
+        }
+        if normalized.contains("upstream service overloaded") {
+            return format!("{service}上游服务过载（HTTP {status}），请稍后重试。")
+        }
+        let safe_detail = sanitize_detail(detail);
+        if !safe_detail.is_empty()
+            && safe_detail.len() <= 180
+            && !safe_detail.starts_with('{')
+            && !safe_detail.to_ascii_lowercase().contains("error code")
+        {
+            return format!("{service}服务暂时不可用（HTTP {status}）：{safe_detail}")
+        }
         return format!("{service}服务暂时不可用（HTTP {status}），请稍后重试；若持续失败，请检查服务商状态或切换模型。")
     }
     format!(
@@ -152,6 +176,16 @@ mod tests {
         let value = provider_error("模型", 502, "error code: 502");
         assert!(value.contains("暂时不可用"));
         assert!(!value.contains("error code"));
+    }
+
+    #[test]
+    fn preserves_actionable_upstream_502_causes_without_sensitive_details() {
+        assert_eq!(
+            provider_error("模型", 502, "Upstream authentication failed, please contact administrator"),
+            "模型上游认证失败（HTTP 502），请在服务商控制台检查分组和上游账号状态。"
+        );
+        assert!(provider_error("模型", 502, "Upstream service temporarily unavailable").contains("Upstream service temporarily unavailable"));
+        assert!(!provider_error("模型", 502, "Bearer sk-secret").contains("sk-secret"));
     }
 
     #[test]

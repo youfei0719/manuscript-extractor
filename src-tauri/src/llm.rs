@@ -33,6 +33,19 @@ fn json_content(value: &Value) -> Result<String, String> {
     Ok(trimmed.to_string())
 }
 
+fn response_error_detail(raw: &str) -> String {
+    let Ok(value) = serde_json::from_str::<Value>(raw) else {
+        return raw.chars().take(300).collect();
+    };
+    value
+        .pointer("/error/message")
+        .or_else(|| value.pointer("/message"))
+        .or_else(|| value.pointer("/error"))
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| raw.chars().take(300).collect())
+}
+
 async fn chat_json(db: &DesktopDb, system: &str, user: &str) -> Result<(Value, String), String> {
     let settings = load_settings(db)?;
     if settings.llm_mode == "offline" {
@@ -65,15 +78,7 @@ async fn chat_json(db: &DesktopDb, system: &str, user: &str) -> Result<(Value, S
         (status, raw) = send_chat_request(&http, &url, &key, &fallback).await?;
     }
     if !status.is_success() {
-        let detail = serde_json::from_str::<Value>(&raw)
-            .ok()
-            .and_then(|value| {
-                value
-                    .pointer("/error/message")
-                    .and_then(Value::as_str)
-                    .map(ToOwned::to_owned)
-            })
-            .unwrap_or_else(|| raw.chars().take(300).collect());
+        let detail = response_error_detail(&raw);
         return Err(audit::provider_error("模型", status.as_u16(), &detail));
     }
     let envelope: Value =
@@ -99,7 +104,11 @@ async fn send_chat_request(
             .map_err(|error| format!("模型连接失败：{error}"))?;
         let status = response.status();
         let raw = response.text().await.map_err(|error| error.to_string())?;
-        if !matches!(status.as_u16(), 502 | 503 | 504) || attempt == 2 {
+        let body_lower = raw.to_ascii_lowercase();
+        let retryable = matches!(status.as_u16(), 502 | 503 | 504)
+            && !body_lower.contains("upstream authentication failed")
+            && !body_lower.contains("upstream access forbidden");
+        if !retryable || attempt == 2 {
             return Ok((status, raw));
         }
         tokio::time::sleep(std::time::Duration::from_millis(700 * (attempt + 1))).await;
@@ -237,5 +246,17 @@ mod tests {
     fn extracts_fenced_json_content() {
         let value = json!({"choices":[{"message":{"content":"```json\n{\"ok\":true}\n```"}}]});
         assert_eq!(json_content(&value).unwrap(), "{\"ok\":true}");
+    }
+
+    #[test]
+    fn extracts_flat_tokenflux_error_messages() {
+        assert_eq!(
+            response_error_detail(r#"{"code":"UPSTREAM_AUTH_FAILED","message":"Upstream authentication failed"}"#),
+            "Upstream authentication failed"
+        );
+        assert_eq!(
+            response_error_detail(r#"{"error":{"message":"Upstream access forbidden"}}"#),
+            "Upstream access forbidden"
+        );
     }
 }
